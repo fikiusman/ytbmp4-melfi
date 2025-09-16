@@ -1,65 +1,57 @@
-const express = require("express");
-const fetch = require("node-fetch");
-const cors = require("cors");
+import express from "express";
+import fetch from "node-fetch";
+import cors from "cors";
 
 const app = express();
 app.use(cors());
 
 const RAPIDAPI_HOST = "youtube-video-fast-downloader-24-7.p.rapidapi.com";
-const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY; // isi di Railway (variable env)
+const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY; // simpan di Railway Variables
 
-if (!RAPIDAPI_KEY) {
-  console.error("❌ RAPIDAPI_KEY belum di-set di Railway");
-}
-
-const headers = {
-  "x-rapidapi-host": RAPIDAPI_HOST,
-  "x-rapidapi-key": RAPIDAPI_KEY,
-};
-
-// helper proxy
-async function proxy(res, url) {
+// ✅ Ambil info lengkap video (judul, author, formats, dll)
+app.get("/api/get-video-info/:id", async (req, res) => {
   try {
-    const r = await fetch(url, { headers });
-    const text = await r.text();
+    const videoId = req.params.id;
 
-    try {
-      const json = JSON.parse(text);
-      res.json(json);
-    } catch {
-      res.send(text); // fallback kalau bukan JSON
-    }
+    const r = await fetch(
+      `https://${RAPIDAPI_HOST}/get_video_details_and_quality/${videoId}`,
+      {
+        headers: {
+          "x-rapidapi-host": RAPIDAPI_HOST,
+          "x-rapidapi-key": RAPIDAPI_KEY,
+        },
+      }
+    );
+
+    const data = await r.json();
+    res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-}
-
-// API routes
-app.get("/api/get-video-info/:id", (req, res) => {
-  const { id } = req.params;
-  proxy(res, `https://${RAPIDAPI_HOST}/get-video-info/${id}`);
 });
 
-app.get("/api/download-video/:id", (req, res) => {
-  const { id } = req.params;
-  const { quality } = req.query;
-  proxy(
-    res,
-    `https://${RAPIDAPI_HOST}/download_video/${id}${quality ? `?quality=${quality}` : ""}`
-  );
-});
+// ✅ Endpoint untuk ambil link download by quality
+app.get("/api/download-video/:id", async (req, res) => {
+  try {
+    const videoId = req.params.id;
+    const quality = req.query.quality || "360p";
 
-app.get("/api/download-short/:id", (req, res) => {
-  const { id } = req.params;
-  const { quality } = req.query;
-  proxy(
-    res,
-    `https://${RAPIDAPI_HOST}/download_short/${id}${quality ? `?quality=${quality}` : ""}`
-  );
-});
+    const r = await fetch(
+      `https://${RAPIDAPI_HOST}/download_video/${videoId}?quality=${quality}`,
+      {
+        headers: {
+          "x-rapidapi-host": RAPIDAPI_HOST,
+          "x-rapidapi-key": RAPIDAPI_KEY,
+        },
+      }
+    );
 
-// health check
-app.get("/", (req, res) => res.send("✅ Melfi MP4 backend aktif 🚀"));
+    const data = await r.json();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
